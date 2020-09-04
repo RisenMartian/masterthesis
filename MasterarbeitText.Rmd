@@ -1,0 +1,1140 @@
+---
+title: 'Semesterarbeit: Multivariate Statistik - Vorhersage von Sonneneruptionen'
+author:
+- affiliation: 1150758
+  name: Martin Hennig
+- affiliation: 1150782
+  name: Catharina Schütt
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output:
+  pdf_document:
+    citation_package: natbib
+    fig_caption: yes
+    keep_tex: yes
+    latex_engine: pdflatex
+    number_sections: yes
+    template: AusarbeitungLatexSetup.tex
+    toc: yes
+    toc_depth: 2
+  word_document:
+    toc: yes
+    toc_depth: '2'
+biblio-style: apsr
+endnote: no
+fontfamily: mathpazo
+fontsize: 12pt
+geometry: margin=1in
+header-includes: \usepackage{hyperref}
+lang: fr
+bibliography: meineBiblioinhalte.bib
+abstract: Sonneneruptionen sind Plasma-Magnetfeldbögen, die an der Sonne durch Magnetfeldenergie gespeißt werden und verheerenden Schaden an der Infrastruktur der Menschheit verursachen können. Daher ist es wichtig, diese vorhersagen zu können. Dabei wird in dieser Semesterarbeit der Datensatz "Solar Flare" untersucht und versucht ein geeignetes Modell zur Vorhersage der Anzahl an Sonneneruptionen zu erstellen. Dabei wurden verschiedene Algorithmen in Betracht gezogen, getestet und am Ende verwendet. Anhand von generalisierten, linearen Modellen ist es gelungen ein solchen Modell zu erstellen und ein Modell zu entwickeln, dass eine relativ geringe Rate an "False-negativ" hat. 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(cache=TRUE,
+                      message=FALSE, warning=FALSE,
+                      fig.path='Bilder/',
+                      fig.width=5,
+                      fig.height = 4,
+                      cache.path = '_cache/',
+                      fig.keep='first',
+                      fig.env = 'figure',
+                      fig.process = function(x) {
+                      x}
+                      )
+library(formatR)
+```
+
+\newpage
+
+
+# Einleitung
+In dieser Semesterarbeit wurde versucht, mit Hilfe des "Solar Flare Data Set", eine Vorhersage der Anzahl an Sonneneruptionen zu tätigen. Ein weiteres Ziel ist außerdem herauszuarbeiten, welche Parameter des Datensatzes dazu notwendig sind bzw. den größten Einfluss darauf haben. Der verwendete Datensatz wurde 1989 von Gary Bradshaw veröffentlicht und umfasst zwei Datensätze: Flare1 und Flare2. Beide Datensätze sind im Aufbau gleich, jedoch hat der zweite Datensatz (Flare2) eine deutlich stärkere Fehlerkorrektur angewendet bekommen. Außerdem ist der Datensatz Flare2 mit 1066 Individuen deutlich größer als Flare1 mit 323 Individuen. Beide Datensätze verfügen über 10 kategoriale Variablen, die in verschiedenen Formen codiert sind. Zusätzlich enthalten die Datensätze drei potenzielle Klassen für Sonneneruptionen. Jeder Beobachtung ist die Anzahl der aufgetretenen Sonneneruptionen innerhalb von 24h dieser Klasse zugeordnet. Der Datensatz beinhaltet keine fehlenden Werte (Missing Values).  
+Link: http://archive.ics.uci.edu/ml/datasets/solar+flare  
+Es handelt sich bei diesem Phänomen der Sonneneruptionen um Sonnenstürme als Ergebnis von 
+Schwankungen der Sonnenaktivität in Form erhöhter Strahlung. Diese treten in der Sonnenchromosphäre, eine der Gasschichten der Sonnenatmorphäre, auf und können sich bis zu einer Größe vom 10x-Erdvolumen ausdehnen. Sie entstehen bei Magnetfeld- bzw. Oberflächenveränderungen dieses Himmelskörpers. Neben der Teilchenstrahlung als koronale Massenauswürfe gibt es dabei elektromagnetische Strahlung, als Flares (Solar Flares) zusammengefasst. Je nach dem Sonnenfleckenzyklus (dunkle Flecken), dessen Periodenlänge i.d.R. ca. 11 Jahre entsprechen und die Anzahl der Sonnenflecken (Flares Häufigkeit) sowie deren Verteilung auf der Sonnenoberfläche (Flares Intensität) beinhaltet, treten die Flares auf. Meistens nimmt dieser Vorgang einen Zeitraum von 10 bis 90 Minuten in Anspruch. Bei der alltäglichen Sonnenaktivität kommt es innerhalb von 24 h zu ca. 5-10 Flares.  
+Je nach Art und Stärke der Sonneneruptionen bedingten Energie können diese auf der Erde, durch Auswirkungen der Beeinflussung auf das Erdmagnetfeld, wahrgenommen werden. Es zeichnet sich bei der Technik, wie zum Beispiel bei den elektrischen Strom-, Telegraphen- und Computernetzen, den Satelliten, dem Rundfunk, dem Mobilfunk und dem GPS, durch Störungen aus, die, von schwachen Beeinträchtigungen bis zum kompletten Ausfall, unterschiedlicher Intensität sind.  
+
+![Sonneneruption.](Bilder/Bild2.png){width=12cm}
+  
+Polarlichter, die nur in einer bestimmten Zone auftreten, sind von der geomagnetischen Sonnenaktivität abhängig. Bei einem geomagnetischen Sturm kommt es durch stärker beschleunigte Elektronen der Magnetosphäre zu helleren und bunteren Polarlichtern. [^1]  
+  
+[^1]: Quelle Bild: https://www.beobachter.ch/umwelt/sonnensturme-die-dunkle-seite-der-sonne
+  
+# Bearbeitung  
+  
+## Einlesen und Anpassen des Datensatzes  
+  
+Für die Analyse des Datensatzes ist es zuerst wichtig, zu verstehen, wie die einzelnen Attribute codiert sind. Dafür muss der Datensatz zunächst eingelesen werden. Für diese Semesterarbeit wurden beide Datensätze wie folgt eingelesen: 
+```{r read}
+# einlesen des Datensatzes
+data1 <- read.csv("flare.data1",header = FALSE,sep = " ",skip = 1) 
+# Datensatz 1
+data2 <- read.csv("flare.data2",header = FALSE,sep = " ",skip = 1) 
+# Datensatz 2 
+colnames(data1) <- c("class","spotsize","spotdistribution","activity",
+                     "evolution"
+                     ,"activitycode","historyproblem","recentproblem",
+                     "totalarea"
+                     ,"arealargestspot","cclass","mclass","xclass") 
+# Spaltennamen für Datensatz Flare1 
+colnames(data2) <- c("class","spotsize","spotdistribution","activity",
+                     "evolution"
+                     ,"activitycode","historyproblem","recentproblem",
+                     "totalarea"
+                     ,"arealargestspot","cclass","mclass","xclass") 
+# Spaltennamen für Datensatz Flare2
+```
+
+Zudem wurden Spaltennamen für die einzelnen Attribute eingefügt. Für einen ersten Überblick über die Daten wird die Summary aufgerufen. Dabei fällt auf, dass die ersten drei Attribute bereits als Faktor eingelesen wurden, die Restlichen jedoch nicht. Dies wird durch den Befehl „as.factor“ geändert.
+
+```{r asfactor, include=FALSE}
+data2$activity <- as.factor(data2$activity)
+data2$evolution <- as.factor(data2$evolution)
+data2$activitycode <- as.factor(data2$activitycode)
+data2$historyproblem <- as.factor(data2$historyproblem)
+data2$recentproblem <- as.factor(data2$recentproblem)
+data2$totalarea <- as.factor(data2$totalarea)
+data2$arealargestspot <- as.factor(data2$arealargestspot)
+```
+```{r summaryundfactor}
+data2$activity <- as.factor(data2$activity) # Beispiel für die 
+#Umwandlung der Daten von Numeric in Factors
+summary(data2)
+```
+
+In der neuen Summary werden die Häufigkeiten der verschiedenen Level jedes Faktors gezeigt. Die Klassen C, M und X für die Sonneneruptionen bleiben als numerische Variablen erhalten, da diese die Anzahl an Sonneneruptionen darstellen. Der Einfachheit halber wird im Folgenden die Summe aller Sonneneruptionen in der Variable „number.dummy“ zusammengefasst. Es wird daher nicht weiter möglich sein eine Klassifizierung nach der Klasse der Sonneneruption durchzuführen. Dafür besteht nun die Möglichkeit die 
+Gesamtzahl an Sonneneruptionen vorherzusagen. Die Erstellung der Dummy-Variable erfolgte wie folgt:
+
+```{r numberdummy}
+data2$number.dummy <- data2$cclass + data2$mclass + data2$xclass 
+# Aufsummierung 
+#der Anzahl an Sonneneruptionen
+data2$number.dummy2 <- as.factor(data2$number.dummy)
+summary(data2) # Umwandlung der Anzahl in einen Faktor
+```
+
+Für weitere Vorhersagen wird ebenfalls bereits eine zweite Dummy-Variable erstellt, in der die Anzahl an Sonneneruptionen als Faktor abgespeichert werden. Dies ist im Besonderen später für die Anwendung der „predict“-Funktion wichtig.  
+
+## Beschreibung des Datensatzes
+
+Der Datensatz besitzt, wie bereits erwähnt, zehn Attribute, die eine bestimmte Codierung haben. Im Folgenden wird auf die einzelnen Attribute eingegangen und diese erklärt:
+
+```{r pieclass, fig.cap=" Levelverteilung des Faktors 'Class' mit der Anzahl  der Häufigkeiten jeder Klasse."}
+library(plotrix)
+mytable <- table(data2$class)
+lbls <- paste(names(mytable), "\n", table(data2$class), sep = "")
+pie3D(mytable, labels = lbls, explode = 0.1,
+      main = "Levelverteilung des Faktors 'Class' mit Anzahl")
+```
+  
+Hierbei handelt es sich um die Klassifizierung der Sonnenflecken nach der „Modified Zurich Class“ in die Klassen A, B, C, D, E, F und H. 
+Klasse A bezeichnet einen kleinen, uniploren Sonnenflecken. Dies kommt entweder in der Formungs- oder in der Endstufe eines Sonnenflecks vor. Klasse B bezeichnet eine bipolare Sonnenfleckgruppe ohne Penumbra. Eine Umbra, der dunkle Kern eines Sonnenflecks, ist ein Blick auf eine der tieferen Sonnenschichten. Während es sich bei einer Penumbra um die Fallstrecke bzw. den Abgrund von der Sonnenoberfläche aus in die tieferen Schichten handelt, stellt eine Umbra, als dunkler Kern eines Sonnenflecks, einen Blick auf eine der tieferen Sonnenschichten dar. Dies ist in Abbildung 2 dargestellt. [^2]  
+  
+![Beschriftete Abbildung eines Sonnenflecks mit einer Penumbra.](Bilder/Sonnenfleck.jpg){width=10cm}
+  
+[^2]: Quelle Bild: https://www.meteoros.de/themen/polarlicht/vorhersage/sonnenflecken/
+    
+Die Klasse C beschreibt ebenfalls eine bipolare Sonnenfleckgruppe, diese jedoch mit mindestens einer Penumbra. Für die Klasse D darf eine bipolare Sonnenfleckgruppe nicht mehr als 10 Grad longitudinaler Weite haben und muss jeweils mindestens eine Penumbra am Anfang und Ende der Gruppe besitzen. Klasse E ist ähnlich, nur dass die longitudinale Weite auf 10 Grad bis 15 Grad beschränkt ist. Die Klasse F beschreibt eine sehr lange Sonnenfleckgruppe, die ebenfalls Prenumbren auf beiden Seite hat und außerdem über 15 Grad longitudinaler Weite groß sind.  Eine unipolare Sonnenfleckgruppe mit Penumbra wird durch Klasse H dargestellt. Abbildung 4 zeigt u.a. Beispielbilder der verschiedenen Klassen. Außerdem zeigt es noch Beispielbilder für die Klassen der Variablen „spotsize“ und „spotdistribution“. [^3]  
+
+[^3]: Quelle Bild: https://www.researchgate.net/figure/The-McIntosh-Sunspot-Group-Classification-Scheme-Courtesy-Patrick-S-McIntosh_fig1_232631884
+  
+![Darstellung der Klassifizierung einer Sonnenfleckgruppe.](Bilder/classes2.jpg){width=10cm}
+  
+Die Variable „spotsize“ beschreibt die Größe des größten Sonnenflecks einer Gruppe. Dabei gibt es die Klassen X, R, S, A, H und K. Klasse X besitzt keine Penumbra und geht mit Gruppenklasse A oder B einher. Wenn die Penumbra nur rudimentär ist, keine deutliche Filamente zeigt, heller als vollständige Prenumbren ist und sich weniger als 3 arcsec von der Umbra ausdehnt, wird dies der Klasse R zugewiesen. Merkmale der Klasse S sind kleine, symmetrische Flecken. Die Penumbra ist gleichmäßig und filamentös. Der Nord-Süd-Durchmesser muss kleiner als 2,5 Grad sein.
+Der Klasse A werden Sonnenflecken zugewiesen, die klein und unsymmetrisch sind und eine ungleichmäßige Penumbra, mit mehreren Umbren und einen Nord-Süd-Durchmesser von weniger als 2,5 Grad haben. Klasse H bezeichnet, als erste Klasse für die Sonnfleckgröße, große, symmetrische Sonnenflecken. Hierbei hat der größte Fleck ähnliche Merkmale wie die der Klasse S, jedoch ist der Durchmesser der Penumbra größer als 2,5 Grad. Außerdem gilt hier eine minimale Fläche von 1/250 millionstel der Oberfläche der Sonnenhalbkugel. Anschließend gibt es noch Klasse K. Bei dieser wird ebenfalls ein großer, jedoch unsymmetrischer Sonnenfleck beschrieben. Außerdem sind hier ähnliche Merkmale wie bei Klasse A vorzufinden. Allerdings wird die Größe auf über 2,5 Grad und die Fläche auf über 1/250 millionstel der Oberfläche der Sonnenhalbkugel festgelegt.
+  
+```{r piespotsize, fig.cap=" Levelverteilung des Faktors 'Spotsize' mit der Anzahl der Häufigkeiten jeder Klasse."}
+mytable <- table(data2$spotsize)
+lbls <- paste(names(mytable), "\n", table(data2$spotsize), sep = "")
+pie3D(mytable, labels = lbls, explode = 0.1,
+      main = "Levelverteilung des Faktors 'Spotsize' mit Anzahl")
+```
+  
+Anschließend ist in der Variable „spotdistribution“ noch eine Codierung in der Form X, O, I und C zu finden. Die Klasse X bezeichnet eine undefinierte Form der Verteilung der Sonnenflecken, wie bei unipolaren den Gruppe (Class A & H). Die Klasse O bezeichnet eine offene (eng. Open) Verteilung. Es sind dabei wenige bis keine Flecken zwischen Gruppenleiter und folgende, Sonnenflecken. In der Klasse I, wie eng. Intermediate, liegen viele Flecken zwischen Leiter und Folger, jedoch besitzt keiner der Letzteren eine vollständige Penumbra. Eine geschlossene (eng. Compact) Gruppe, bei der zwischen Leitfleck und Folgerflecken mehrere starke, große Sonnenflecken mit vollständigen Prenumbren. In extremen Fällen liegt die komplette Gruppe in einer sehr großen Penumbra.
+  
+```{r piespotdistribution, fig.cap=" Levelverteilung des Faktors 'spotdistribution' mit der Anzahl  der Häufigkeiten jeder Klasse."}
+mytable <- table(data2$ spotdistribution)
+lbls <- paste(names(mytable), "\n", table(data2$ spotdistribution), sep = "")
+pie3D(mytable, labels = lbls, explode = 0.1,
+      main = "Levelverteilung des Faktors
+      'Spotdistribution' mit Anzahl")
+```
+  
+Beim Betrachten der Abbildung 1, 4 und 5 fällt auf, dass die Klassen nicht gleichmäßig verteilt sind. Bei der Variable „Class“ fallen z.B. nur 4% der Daten in Klasse F während 31% der Daten in Klasse H fallen. Ähnliches gilt für die Variable „Spotsize“: die geringste Häufigkeit tritt mit 2,5% bei Klasse H und die häufigste Klasse bei S mit 38,8% auf.  Für die Variable „Spotdistribution“ ist es extremer: 3% der Daten gehören Klasse C an, während 44,5% der Daten Klasse O angehören. 
+Für das spätere Sampling und Testen der Daten ist es auch wichtig, ob die erklärte Variable gleichmäßig streut bzw. jedes der Levels gleichmäßig in den Daten vertreten ist. Dies kann überprüft werden, indem die Dummy-Variable „number.dummy“, die numerisch ist, in eine faktorielle Variable umgewandelt wird. Dies wird unter der neuen Dummy-Variable „number.dummy2“ gespeichert, wie bereits oben erwähnt.  
+
+```{r tabledummy2}
+table((data2$number.dummy2))
+prop.table(table((data2$number.dummy2)))
+```
+  
+Hier ist zu erkennen, dass die Häufigkeiten alles andere als gleichmäßig verteilt sind. Nur bei 0,1% der Daten traten 8 Sonneneruptionen auf, während bei der Mehrheit der Daten, hier 81,1%, keine einzelne Sonneneruption auftrat. Es sind weitere Variablen im Datensatz vorhanden. Spalte 4 bezieht sich auf die Aktivität des Sonnenflecks. Diese kann entweder unverändert (codiert als 2) oder reduziert (codiert als 1) sein. 
+Ein weiteres Attribut ist die Entwicklung des Sonnenflecks. Diese Sonnenflecken können an Größe und Intensität rückläufig (codiert als 1 (eng. Decaying)), ohne Wachstum und damit stetig (codiert als 2 (eng. No growth)) oder, mit einer 3 codiert, ein Wachstum der Sonnenflecken bzw. der Sonnenfleckgruppe sein.  
+
+```{r barplots1, fig.cap=" Häufigkeiten der Aktivität und Entwicklung der Attribute."}
+par(mfrow = c (1,2))
+plot(data2$activity, main = "Acitivity", xlab = "Klasse", 
+     ylab = "Häufigkeit im Datensatz" )
+plot(data2$evolution, main = "Evolution", xlab = "Klasse", 
+     ylab = "Häufigkeit im Datensatz" )
+```
+  
+Es ist zu sehen, dass auch hier die unterschiedlichen Klassen nicht gleichmäßig im Datensatz vorliegen. Bei der „Aktivität“ liegen zwar lediglich zwei Level vor, diese sind jedoch stark unterschiedlich häufig vorhanden. Bei der Variable „Evolution“ sind die Level 2 und 3 ähnlich häufig vertreten, jedoch ist die Klasse 1 (decaying) nur sehr selten vertreten.  
+
+```{r barplots2, fig.cap=" Häufigkeiten des Aktivitätscodes und der historischen Bedeutung."}
+par(mfrow = c (1,2))
+plot(data2$activitycode, main = "Acitivity Code", xlab = "Klasse", 
+     ylab = "Häufigkeit im Datensatz" )
+plot(data2$historyproblem, main = "History Problem", xlab = "Klasse", 
+     ylab = "Häufigkeit im Datensatz" )
+```
+  
+Dieses Problem besteht auch weiter bei den Variablen „Activity Code“. Hier sind die Klassen 2 und 3 deutlich unterrepräsentiert, während 1 auf fast jede Beobachtung zutrifft. Hierbei steht Klasse 1 dafür, dass keine Sonneneruption, die der M1-Klasse oder stärker entspricht, aufgezeichnet wurde. Die Klasse 2 steht dafür, dass genau eine M1 Sonneneruption verzeichnet wurde. Dementsprechend bedeutet Klasse 3, dass mehr als eine M1 Sonneneruption in den letzten 24h verzeichnet wurde.
+Die Variable „Historiy Problem“, oder auch in der Datensatz Beschreibung als „historically-complex“ bezeichnet, sagt in nur zwei Leveln (dichom) aus, ob es in dieser Region bereits in der weiteren Vergangenheit (mehr als 1 Jahr) schon Sonneneruptionen gab. Bei der Variable „History Problem“ sieht es mit der Häufigkeitsverteilung etwas anders als bei den anderen Variablen aus. Hier besteht eine in etwa ähnliche Häufigkeit der beiden Klassen 1 und 2.  
+
+```{r barplots3, fig.cap=" Häufigkeiten der aktuellen Problematik und der gesamt Fläche."}
+par(mfrow = c (1,2))
+plot(data2$recentproblem, main = "Recent Problem", xlab = "Klasse",
+     ylab = "Häufigkeit im Datensatz" )
+plot(data2$totalarea, main = "Total Area", xlab = "Klasse", 
+     ylab = "Häufigkeit im Datensatz" )
+```
+  
+Die beiden Variablen „Recent Problem“ und „Total Area“ sind ebenfalls dichotom und haben jeweils die Klassen 1 und 2. Hierbei steht in der Variable „Recent Problem“ der Wert 1 dafür, dass diese Region bereits in dem Jahr der Beobachtung eine oder mehr Sonneneruptionen losgelassen hat. Null steht dementsprechend für das Gegenteil. Die Variable „Total Area“ beschreibt lediglich, ob die Gesamtfläche des Sonnenflecks klein ( = 1 ) oder groß ( = 2) ist. Auch bei diesen beiden Variablen ist die Häufigkeit der beiden Klassen jeweils stark unterschiedlich.
+Die letzte, erklärende, Variable „Area of the largest Spot“ besitzt zwar theoretisch zwei Klassen, dabei kommt jedoch nur eine vor: Die Klasse 1. Diese steht dafür, dass der größte Sonnenfleck einer Gruppe 5 Grad [^4] oder kleiner ist.  
+
+[^4]: hier ist die Erläuterung des Datensatzes leider nicht eindeutig.
+
+![Darstellung der Klassen für Sonneneruptionen im Graphen.](Bilder/classes3.png){width=10cm}  
+
+![Darstellung der Klassenintensitäten für Sonneneruptionen.](Bilder/Bild1.png){width=5cm}   
+
+
+Die Stärke von Sonneneruptionen ist nach ihrer Einflussnahme auf die Erde abgestuft in Radiostörungen durch den Röntgenblitz (R), Strahlungseffekte durch hochenergetische Teilchen (S) und geomagnetische Effekte durch die Plasmawolke (G). Dabei gliedert man jeweils von schwach bis stark in fünf Stärkestufen. Die Art der Einflussnahme des Sonnensturmes wird als Buchstabe zusammen mit der Nummer der Information zur Stärke beschrieben. Zum Beispiel würde eine Sonneneruption mit schwachen Strahlungseffekten als S1 bezeichnet werden. Des Weiteren gibt es die Einteilung eines Flares nach der von A über B, C und M zu X wachsenden Stärke. Ähnlich der Erdbebenrichterskala ist diese Bewertung aufgrund des maximalen Röntgenflusses logarithmisch. Zusätzlich gibt es eine weitere nicht-logarithmische, feinere Skalierung von 1 bis 10, die auf keinem Logarithmus basiert. Während ein B-Flare 10x stärker als ein A-Flare ist, wird X9 in der Klasse X höher gewertet als X2. Gleichzeitig bedeuten zum Beispiel A10 und B1 das Gleiche. Die Klasse X wird aufgrund durch eine nicht einzuschränkende, mögliche starke Sonneneruption unendlich weit fortgezählt.  
+
+
+```{r barplots4, fig.cap=" Häufigkeiten der verschiedenen Klassen an Sonneneruptionen."}
+(table(data2$cclass))
+(table(data2$mclass))
+(table(data2$xclass))
+
+par(mfrow = c (1,3))
+barplot(table(data2$cclass),  main = "C-Class", xlab = "Anzahl der Flares",
+        ylab = "Häufigkeit im Datensatz" )
+barplot(table(data2$mclass),  main = "M-Class", xlab = "Anzahl der Flares", 
+        ylab = "Häufigkeit im Datensatz" )
+barplot(table(data2$xclass),  main = "X-Class", xlab = "Anzahl der Flares", 
+        ylab = "Häufigkeit im Datensatz" )
+```
+  
+In folgender Abbildung ist die Gesamtzahl der Sonneneruptionen gegen den Index aufgetragen. Dabei ist zu erkennen, dass die Anzahl der Sonneneruptionen keinen einheitlichen Trend innerhalb des Datensatzes zeigt. Dies ist zwar für die Analyse in einem Model nach einer Aufsplittung des Datensatzes praktisch, zeigt jedoch auch eine der Schwierigkeiten des Datensatzes auf: Die Nachvollziehbarkeit der einzelnen Beobachtungen. Es ist keine Zeit oder Ähnliches mit erfasst worden, wodurch jede Beobachtung ohne Kontext steht. Dies ist insofern problematisch, da kein Sachverständnis in die Analyse mit einfließen kann, wie die Daten erhoben worden sind.
+  
+```{r barplots5, fig.cap=" Gesamthäufigkeiten an Sonneneruptionen."}
+plot(data2$number.dummy, type = "S",
+     main = "Anzahl an Sonneneruptionen im Datensatz", 
+     xlab = "Index im Datensatz", ylab = "Anzahl an Sonneneruptionen")
+``` 
+
+Wird die Verteilung der verschiedenen Werte der jeweiligen Klassen (C, M und X) im Datensatz untersucht, fällt auf, dass hier ebenfalls die unterschiedlichen Werte der Variablen nicht gleichhäufig auftreten. Während C-Flares noch „relativ häufig“ sind (17% aller Beobachtungen hatten mindestens eine C1-Flare), sind M-Flares schon deutlich seltener mit 3,3% aller Beobachtungen. Die X-Flares kommen nur bei 5 Beobachtungen vor (0,5%). Dies ist ein Problem für die weitere Bearbeitung der Vorhersage von Sonneneruptionen, da durch so wenige Ereignisse kaum ein Lerneffekt für die verschiedenen Klassifikationsalgorithmen möglich ist und damit kaum eine Grundlage zur Identifizierung einer X-Flare gegeben ist. Dies ist der Grund, weswegen im Weiteren nur die Gesamtzahl der Sonneneruptionen vorhergesagt werden soll und nicht zusätzlich die Klasse.  
+
+## Ansätze zur Modellerstellung   
+
+Um eine Vorhersage zu tätigen, wie viele Sonneneruptionen durch eine bestimmte Sonnenfleckgruppe entstehen, muss zuerst ein Model erstellt werden. Dafür sind vorher einige Sachen zu beachten. Zuerst muss der Datensatz entweder in ein Trainings- und ein Testdatenset gespalten werden oder ein zweiter Datensatz zum Testen herangezogen werden. Der Vorteil der Methodik des Aufteilens des Datensatzes in ein Trainings- und ein Testdatenset ist, dass der gleiche Fehler auf beide Teildatensätze zutrifft. Es wäre möglich, dass, wie es bei diesen beiden Flare-Datensätzen ist, die Datensätze unterschiedlich vorbehandelt wurden und eine unterschiedliche Fehlerkorrektur bekommen haben. Da für diese Semesterarbeit kein erkennbarer Unterschied zwischen den Datensätzen Flare1 und Flare 2 zu sehen ist, wird der Flare2 Datensatz zum Trainieren und der Flare1 Datensatz zum Testen verwendet. Zur Überprüfung wurde jedoch auch die Methode des Splittings eines Datensatzes (Flare2) getestet. 
+Das Aufspalten des Datensatzes erfolgt wie folgt:  
+
+```{r Splitting}
+library(caret)
+set.seed(1231)
+Train <- createDataPartition(data2$number.dummy, p = 0.95, list = FALSE)
+training1 <- data2[Train,]
+testing1 <- data2[-Train,]
+```
+  
+Dabei wurde der Datensatz Flare2 in ein Trainingsdatensatz mit 95% der Daten und einen Testdatensatz mit 5% der Daten aufgeteilt. Hierbei kann mit verschiedenen Verhältnissen gearbeitet werden. Dabei ist nun die Fehleranfälligkeit des Models relativ hoch, da verhältnismäßig wenig tatsächliche Sonneneruptionsevents in dem Trainingsdatensatz vorzufinden sind (im Vergleich zu nicht Sonneneruptionsevents). Es ist nur durch eine sehr bewusste Auswahl der Trainingsdaten zu verhindern. Dies kann aber einen riesigen potentiellen Bias mit sich führen und dadurch einen systematischen Fehler aufzeigen.  
+  
+### Random Forest
+  
+Es gibt viele verschiedene Algorithmen zur Bearbeitung einer solchen Aufgabe. Einige Beispiele wären Entscheidungsbäume (bzw. RandomForest), k-Nearest-Neighbour oder aber auch simple, lineare Modelle. Einer dieser Datentypen zur Bildung einer Hierarchie der einzelnen Informationen ist der Dicision Tree. Die verwendeten Attribute bilden dabei die Knoten ab, ausgehend von der Wurzelknoten als Ursprungsknoten. Je nach Ordnung führt ein Knoten zum Nächsten, über n Dimensionen hinweg. Ein Knoten der nicht weitergeführt wird, erhält die Bezeichnung Blatt. Verweise auf die einzelnen Knoten werden als Kanten bezeichnet. Ein Decision Tree ist ein Instrument des maschinellen Lernens. Durch verschiedene Regeln wird ein Prozess zur Entscheidungsfindung durchgeführt, der schließlich der Beantwortung einer Fragestellung dient. Die Art und Weise folgen dabei der Klassifikation und Regression. Es gibt Optimierungsmöglichkeiten des Standardverfahrens durch Bagging, Boosting, Pruning oder auch in Kombination mit neuronalen Netzwerken. Wenn z.B. mehrere Fragestellungen von Bedeutung sind, können Entscheidungsbäume auch zu einem Entscheidungswald kombiniert werden. Decision Trees können schnell recht komplex und unübersichtlich werden. Dafür sind sie einfach und vielfältig anzuwenden. Der Datensatz für einen Entscheidungsbaum sollte möglichst homogen sein und wird in Untergruppen unterteilt. 
+Im folgenden Code-Snippet ist ein Beispiel für die Anwendung des Random-Forests für den Datensatz aufgezeigt.  
+
+```{r randomforest, eval = FALSE, echo = TRUE}
+install.packages("randomForest")
+library(randomForest) # benötigtes Paket 
+set.seed(1234) # Seed zur reproduzierbarkeit
+
+data2_rf = randomForest(number.dummy~., data = data2, ntree = 500, proximity = T) 
+# number.dummy als erklärte Variable mit 500 Bäumen und der Bewertung 
+#aufgrund der Nähe der Variablen beim Erstellen eines Baumes
+data2Pred <- predict(data2_rf, newdata = data1) # prediction der Daten 
+#aus dem Datensatz Flare1 
+table(data2Pred, data1$number.dummy) # Crosstable der Predictions und der
+#tatsächlichen Klasse
+```  
+
+Hierbei ist während der Ausarbeitung aufgefallen, dass dieser Ansatz sich nicht zu eignen scheint, da die Fehlerquote nicht unter 82% zu senken war. Daher wurde dieser Ansatz aus Zeitgründen nicht weiter verfolgt.
+  
+### k-Nearest-Neighbours  
+  
+Der kNN-Algorithmus (k nearest neighbour) ist ebenso eine Anwendungsmöglichkeit im Bereich des maschinellen Lernens und arbeitet mit Klassifizierung und Regression. Dabei wird die Anzahl „k“ an benachbarten Werten eines Wertes ermittelt. Dafür werden die einzelnen Abstände zwischen dem zu klassifizierenden Wert und den Trainingsdaten berechnet. Die Klasse, zu der der Wert zugeordnet wird, entspricht dabei der am häufigsten vorkommenden Klasse der Nachbarwerte. Die Trainingsdaten, die einen großen Datensatz ausmachen sollten, werden geplottet und es werden Labels hinzugefügt. Die Trainingsdaten werden zu jeder Klassifizierung neu geladen. Außerdem gibt es ein Testset, mit dem die Distanzberechnung und die Klassifizierung durchgeführt werden. Die Ergebnisse werden mit den Originalklassen verglichen. Es gibt einen Vektorraum mit n-Dimensionen wobei „n“ den Eingabevektor darstellt. Da der Wert einer Achse bei der Analyse mehr ins Gewicht fallen kann, besteht die Möglichkeit der Anwendung einer Normalisierung bzw. Standardisierung der Werte bevor „k“ ermittelt wird, damit das Regressionsproblem behoben wird. Je nach Anzahl der Trainingsdaten sollte die Höhe von „k“ bei dessen Wahl ausfallen. Zur verstärkten Eindeutigkeit des Ergebnisses sollte eine ungerade Zahl für „k“ verwendet werden. Es können verschiedene „k“ getestet werden, sodass die Fehlerraten verglichen und ihnen entgegengewirkt werden kann. Während ein kleines „k“ zu einer instabilen Klassifizierung durch unklare Klassentrennungen, große Abweichungen und einer schlechten Reaktion auf Ausreißer führen kann, erzeugt es aber einen geringeren Bias. Ein großes „k“ kann große Modellvoreingenommenheit und Falschklassifizierungen der Trainingsdaten mit sich bringen, aber auch eine übersichtlichere Klasseneinteilung und damit eine stabilere Entscheidung herbeiführen. Die Wahl von „k“ ist Erfahrungssache und muss ggf. so lange ausprobiert werden, bis es zum Datensatz passt. Der kNN-Algorithmus ist leicht verständlich, robust und überwacht. Gleichzeitig ist er speicherintensiv, kostenintensiv bei der Berechnung und kann schlecht mit seltenen Eingabewerten umgehen. Dies ist der Grund warum der Algrotihmus hier nach einigen Versuchen bereits als mögliches Prediction-Tool verworfen wurde.
+  
+## Lineare Modelle  
+  
+Das Anwenden eines linearen Models erfolgt über die numerische Variable „number.dummy“. Im nachfolgenden Code wird das Beispiel für das erste, lineare Model gezeigt, bei dem alle Variablen (außer „arealargestspot“, da diese Variable nur eine Klasse aufweist) mit einbezogen werden.
+  
+```{r entfernenvonarealargestspot,  include=FALSE}
+library(tidyverse)
+summary(training1)
+```
+  
+  
+```{r linmodel1}
+# erstellen des linearen Models
+
+summary(training1)
+lmodel <- glm(number.dummy ~ class + spotsize + spotdistribution 
+              + activity + evolution + activitycode + historyproblem 
+              + recentproblem + totalarea, data = training1)
+summary(lmodel)
+#erstellen der ersten Vorhersagen
+
+predictions <- predict.glm(lmodel, newdata = testing1)
+predictions <- as.factor(round(predictions))
+# darstellen des prediction errors
+RMSE(predictions, testing1$number.dummy)  
+# ergänzen der level der prediction
+levels(predictions)  
+levels(predictions) <- c(levels(predictions),"2","3", "4") 
+levels(as.factor(testing1$number.dummy))  
+# überblick über die Leistung des Models
+confusionMatrix(predictions, factor(testing1$number.dummy))
+
+```
+  
+Hier mussten für die confusionMatrix noch die fehlenden Level, gegenüber des Testdatensatzes, ergänzt werden. Dies ist daher notwendig, dass der Algorithmus (hier „glm“, Erklärung folgt) sehr viele Beobachtungen ohne Sonneneruption zum Training erhalten hat und daher viele Individuen MIT Sonneneruption trotzdem den ohne Sonneneruption zuordnet werden. Der RMSE (Root mean squared error) Wert gibt an, um wie viel sich im Durchschnitt bei den Predictions verschätzt wurde.  
+Zur Erklärung eines linearen Models mit ausschließlich kategorialen erklärenden Variablen, wird sich beispielhaft die Art und Weise des Dummy-Codings in R betrachtet, hier anhand der Variable Class.  
+
+```{r contrast}
+contrasts(data2$class)
+```
+
+Der glm() Algorithmus steht für ein generelles lineares Modell. Dabei besteht unter anderem die Möglichkeit kategoriale Variablen über eine "link"-Funktion besser in das Modell mit einzupflegen. Dies ermöglicht eine andere Art der Regressionsanalyse und ist durch verschiedene Familien möglich. Generell lässt sich sagen, dass das lm() Modell ein besonderer Fall eines glm() Modells ist. Unterschiede zwischen lm() und glm() sind, dass bei glm() eine Transformation via "link"-Funktion stattfindet und verschiedene Regressionsmodelle verwendet werden können. 
+Bei dem lmodel in dem vorherigen Code ist zu sehen, dass bestimmte Klassen anscheinend eine höhere statistische Relevanz haben, als andere. Besonders zu nennen sind hier "spotsizeK", "activity2" und "activitycode3". Diese scheinen einen relativ hohen Einfluss auf die Anzahl an erwarteten Sonneneruptionen zu haben. Hierbei ist für die Koeffizienten immer zu beachten, dass es sich dabei um die log(odds) handelt. Es müssen bei der Prediction einige Level ergänzt werden, da diese nicht in der Prediction vorzufinden waren. Dies sind die höheren Level, die in den Trainingsdaten vorkommen. Der Grund dafür liegt wohl in der Beschaffenheit des Trainingdatensatzes. Es sind zu wenig Beobachtungen mit hohen Anzahlen vorhanden und sehr viele gänzlich ohne. Diese Ergänzung ist außerdem für die Confusion Matrix notwendig. Anhand der Kennzahlen der Overall Statistics ist zu sehen, dass dieses Modell eine Genauigkeit von ca. 70% besitzt. Dieser Wert ist mit Vorsicht zu genießen, da es sehr viele "0"-Werte gibt. Es gibt 8 von 53 (15%) falsch negative Werte und 4 von 53 (7%) falsch positive Ergebnisse und damit noch 8% vom Level her falsche Ergebnisse. Allerdings ist der P-Value sehr hoch mit 0.78. Daher ist es schwierig zu bewerten, ob dieses Modell verlässlich ist oder nicht. Es ist jedoch besser als kein Modell zu besitzen, aber es müssen alle Parameter bekannt sein, was in der Praxis bei Sonnenflecken jedoch kein Probelm ist. Um das Modell zu verbessern, ist es wichtig zu verstehen welche Variable einen großen Einfluss hat. 
+  
+
+## Dummy-Coding, Prediction und ANOVA
+
+Um herauszufinden welche Variablen einen statistisch signifikanten Einfluss auf das Model haben, müssen sowohl Modelle mit nur einer erklärenden Variable, als auch mit Kombinationen einzelner Variablen und allen Variablen erstellt werden. Dafür werden einfache lineare Modelle erstellt, mit nur einer erklärenden Variable und "number.dummy" als erklärte Variable.  
+
+```{r linmodeleinzeln}
+lm1 <- glm(number.dummy ~ class, data = data2)
+lm2 <- glm(number.dummy ~ spotsize, data = data2)
+lm3 <- glm(number.dummy ~ spotdistribution, data = data2)
+lm4 <- glm(number.dummy ~ activity, data = data2)
+lm5 <- glm(number.dummy ~ evolution, data = data2) 
+lm6 <- glm(number.dummy ~ activitycode, data = data2)
+lm7 <- glm(number.dummy ~ historyproblem, data = data2)
+lm8 <- glm(number.dummy ~ recentproblem, data = data2)
+lm9 <- glm(number.dummy ~ totalarea, data = data2)
+```
+  
+Hierbei wurde bei jeder Variable mindestens eine Klasse als statistisch signifikant für das Model erachtet. Mit einer Ausnahme: der Variablen "Evolution". Daher wird in den weiteren Modelen die Variable "Evolution" nicht mehr weiter berücksichtigt. 
+
+```{r linmodelall}
+lm_all2 <- glm(number.dummy ~ class + spotsize + spotdistribution + activity 
+               + activitycode + historyproblem + recentproblem + totalarea
+               , data = data2)
+summary(lm_all2)
+
+```
+
+Bei der Ausführung des Modells mit allen Variablen außer "Evolution" fällt auf, dass hier nur noch fünf statistisch signifikante Klassen auftreten. Dabei ist die Größe des Leitflecks einer Sonnenfleckgruppe mit der Klasse K am stärksten signifikant. 
+Eine Unabhängigkeit jeder Variable zu einer anderen zu überprüfen, ist leider im Rahmen dieser Semesterarbeit nicht möglich gewesen. Jedoch ist zu erwähnen, dass dafür der Chi-Squared Independence Test zu nutzen wäre. Allerdings ist dieser mit der aktuellen Codierung der Variablen nicht möglich. Zudem sind die Daten nicht ordinal, sondern lediglich nominal mit einer Andeutung an ordinal. Aus dem Sachzusammenhang wird jedoch erschlossen, dass mehrere Klassen der Sonnenfleckgruppenklassifizierung (class, spotsize und spotdistribution) abhängig voneinander sind, da einige Kombinationen meist zusammen 
+auftreten müssen (z.B. classE mit spotdistributionO). Daher ist davon auszugehen, dass auch bei den anderen Variablen eine gewisse Abhängigkeit der Variablen zueinander herrscht. Diese Vermutung basiert jedoch lediglich auf dem Sachverstand und der Dokumentation. 
+
+Ein weiterer Schritt nach der reinen Anwendung des glm() und der predict Funktion ist eine ANOVA. ANOVA steht für analysis of variance und kann eine Aussage über die Leistung eines Modells erheben. Dafür wird zunächst ein reduziertes Modell verwendet, bei dem lediglich die Variablen "spotsize", "spotdistribution", "activity" und "activitycode" als Predikatoren verwendet werden. In der Summary scheint fast jede Klasse eine statistische Signifikanz zu besitzen. 
+  
+```{r linmodelreduced}
+lm_allred <- glm(number.dummy ~ class + spotsize + spotdistribution + activity 
+               , data = data2)
+summary(lm_allred)
+layout(matrix(c(1,2,3,4),2,2))
+
+```
+  
+Anhand des QQ-Plots ( über "plot(lm_allred)" ) ist zu erkennen, dass keine Normalverteilung vorliegt. 
+Mit diesem Modell und dem vollständigen Modell wurden noch zu Testzwecken eine ANOVA durchgeführt. 
+```{r anova} 
+library(car)
+Anova(lm_all2, type=c("II","III", 2, 3), 
+      error.estimate=c("pearson", "dispersion", "deviance"))  
+
+Anova(lm_allred,  type=c("II","III", 2, 3), 
+      error.estimate=c("pearson", "dispersion", "deviance"))
+
+```
+  
+Hier zu sehen ist, dass bei dem vollständigen Modell nur die ersten 4 Variablen eine statistische Relevanz besitzen, also in den Variablenklassen ein großer Unterschied liegt. Die Anova Funktion aus den "car"-Package berechnet die Liklihood-Ratio des Chi-Squared. Dies ist daher möglich, da diese Funktion die Variablen automatisch passend Dummy-codiert. 
+Weil jedoch die Anova Funktion eigentlich nur auf homoskedastische Datensätze angewendet werden sollte, ist es problematisch dieses Ergebnis als richtig zu bewerten. Es sagt jedoch, dass diese Variablen Klassen haben, die sich statistisch unterscheiden. Daher wird für eine Vorhersage nun der Einfachheit halber das reduzierte Modell verwendet.
+  
+```{r vorhersagefinal} 
+predictions2 <- predict.glm(lm_allred, newdata = testing1)
+predictions2 <- as.factor(round(predictions2))
+levels(predictions2)
+levels(as.factor(testing1$number.dummy))
+levels(predictions2) <- c(levels(predictions2),"3", "4") 
+
+confusionMatrix(predictions2, factor(testing1$number.dummy))
+```
+  
+Anhand der Confusion Matrix ist zu sehen, dass hier die False-Negativ-Rate geringer ist und das ist für dies Modell besonders wichtig. Die Genauigkeit scheint zwar zunächst gleich, da jedoch die False-Negativ-Rate wichtiger ist, als die exakte Anzahl an Flares, ist dieses Modell als besser zu bewerten. 
+Um ein besseres Modell zu erreichen, wird nun der Trainingsdatensatz angepasst. Hier wird das Verhältnis von "keine Sonneneruption" zu "eine oder mehr Sonneneruptionen" verringert. Dafür wird ein Trainingsdatensatz erzeugt, in dem 1/3 aller Daten mindestens eine Flare erzeugt haben. Außerdem wird ein zufälliges Datenset aus den Grunddatensatz als Testset entnommen.
+  
+```{r handdata} 
+library(tidyverse)
+set.seed(1231)
+fdata2 <- filter(data2, data2$number.dummy > 0)
+sdata2 <- sample_n(data2, 402, replace = TRUE)
+data2_training <- rbind(fdata2, sdata2)
+
+data2_test = sample_n(data2, 100, replace = TRUE)
+data2_test$number.dummy <- as.factor(data2_test$number.dummy)
+```
+  
+```{r final modell} 
+lm_final <- glm(number.dummy ~ class + spotsize + spotdistribution + activity 
+               , data = data2_training)
+
+predictions3 <- predict.glm(lm_final, newdata = data2_test)
+predictions3 <- as.factor(round(predictions3))
+
+confusionMatrix(predictions3, (data2_test$number.dummy))
+
+```
+  
+Trotz der Annahme, dass dieses Modell besser vorhersagen sollte, ist dies nicht der Fall. Grund dafür könnte sowohl der Bias sein, der durch die Handverlesung des neuen Trainingsdatensatzes entsteht, als auch eine unglückliche Kombination von unwahrscheinlichen Ergebnissen in dem Testsatz.
+
+
+# Zusammenfassung
+
+Zusammenfassend lässt sich sagen, dass es möglich ist eine Anzahl an Sonneneruptionen anhand des vorliegenden Datensatzes vorherzusagen. Jedoch ist es im Rahmen dieser Semesterarbeit nicht gelungen eine ausreichend genaue Vorhersage tätigen zu können. Allerdings ist es gelungen, durch Veränderungen am Modell ein besseres Ergebnis als mit den ersten Modellen zu erzielen. Diese lässt sich in der False-Negativ-Rate begründen, da es zuerst wichtig ist, ob überhaupt eine Flare entsteht und erst sekundär wichtig, wie viele Flares entstehen. Da bei dieser Vorhersage nicht berücksichtigt wurde, welcher Klasse die Flares angehören, ist es insgesamt schwierig, das Ergebnis vollends zu beurteilen.
+Es fehlen weitere Tools, um mit der Masse an ausschließlich kategorialen Predikatoren eine allgemein gültige Vorhersage zur numerischen Anzahl der Sonneneruptionen zu tätigen. Dennoch hat sich gezeigt, dass es möglich ist eine wage Aussage zu tätigen. 
+
+\newpage
+
+# Literaturverzeichnis
+
+- National Aeronautics and Space Administration NASA Official: Brian Dunbar, NASA Headquarters, 300 E. Street SW, Suite 5R30, Washington, DC 20546. Onlinequelle: https://www.nasa.gov/topics/solarsystem/features/halloween_storms.html, (zuletzt abgerufen am 21.01.2020).  
+
+- Öffentlichkeitsarbeit, FAQ Sonnenstürme und Sonnenaktivität, Wie werden Sonnenstürme klassifiziert?, Max-Planck-Institut für Sonnensystemforschung, Max-Planck-Gesellschaft zur Förderung der Wissenschaften e.V. Hofgartenstraße 8, 80539 München, Onlinequelle: https://www.mps.mpg.de/sonnenstuerme-sonnenaktivitaet-faq/3, (zuletzt abgerufen am 21.01.2020).
+
+- Ganse, Bergita; Spanier, Felix: Einfluss der kosmischen Strahlung auf den Menschen, 16.12.2011. Welt der Physik, Deutsche Physikalische Gesellschaft e.V. Hauptstraße 5, 53604 Bad Honnef. Onlinequelle: https://www.weltderphysik.de/gebiet/leben/einfluesse-auf-den-menschen/kosmische-strahlung/, (zuletzt abgerufen am 21.01.2020).  
+
+- Hülsberg, Marcel: Sonneneruptionen und ihre Auswirkungen auf kosmische Strahlung, Auswertung der Daten des Trigger-Hodoskops, Fünfte Prüfungskomponente in Form einer besonderen Lernleistung im Fach Physik mit Bezug zum Fach Informatik, 04.01.2012.  
+
+- Kassambara, Alboukadel: Machine Learning, Regression Analysis, Regression with categorial Variables: Dummy Coding Essentials in R, 11.03.2018. Sthda Statistical Tools For High-Throughput Data Analysis. Onlinequelle: Http://Www.Sthda.Com/English/Articles/40-Regression-Analysis/163-Regression-With-Categorical-Variables-Dummy-Coding-Essentials-In-R/, (zuletzt abgerufen am 19.01.2020).  
+
+- Multiple regression with categorical and numeric predictors, 04.03.2014. Cross validated, Stack Exchange Inc; user contributions licensed under cc by-sa 4.0, Stack Overflow GmbH c/o WeWork, Oskar-von-Miller Ring 20, 80333 München, Onlinequelle:
+https://stats.stackexchange.com/questions/88606/multiple-regression-with-categorical-and-numeric-predictors, (zuletzt abgerufen am 19.01.2020).  
+
+- Yau, Chi: Chi-squared Test of Independence R Tutorial, R Tutorial, An R Introduction to Statistics. Onlinequelle: https://www.r-tutor.com/elementary-statistics/goodness-fit/chi-squared-test-independence, (zuletzt abgerufen am 19.01.2020).  
+
+- Michy, Alice: Regression Models in R, How to Perform a Logistic Regression in R, 13.09.2013 veröffentlicht, 24.06.2018 aktualisiert. Datascienceplus. Onlinequelle: https://datascienceplus.com/perform-logistic-regression-in-r/, (zuletzt abgerufen am 19.01.2020).  
+
+\newpage
+  
+# Anhang  
+  
+```{r Anhang, eval = FALSE, echo = TRUE} 
+### working directory
+
+setwd("C:/Users/marti/sciebo/StatistikSemesterarbeit/StatistikSemesterarbeit") ##Anroechte
+setwd("C:/Users/Martin/sciebo/StatistikSemesterarbeit/StatistikSemesterarbeit") ##Hamm
+
+#### read in and col names
+{### read in data as csv with  " " without first row
+data1 <- read.csv("flare.data1",header = FALSE,sep = " ",skip = 1)
+data2 <- read.csv("flare.data2",header = FALSE,sep = " ",skip = 1)
+### adding column names referring to data description
+colnames(data1) <- c("class","spotsize","spotdistribution","activity","evolution","activitycode","historyproblem","recentproblem","totalarea","arealargestspot","cclass","mclass","xclass")
+colnames(data1)
+colnames(data2) <- c("class","spotsize","spotdistribution","activity","evolution","activitycode","historyproblem","recentproblem","totalarea","arealargestspot","cclass","mclass","xclass")
+colnames(data2)}
+
+### making columns factor since they are coded and read in as integer
+{data2$activity <- as.factor(data2$activity)
+data2$evolution <- as.factor(data2$evolution)
+data2$activitycode <- as.factor(data2$activitycode)
+data2$historyproblem <- as.factor(data2$historyproblem)
+data2$recentproblem <- as.factor(data2$recentproblem)
+data2$totalarea <- as.factor(data2$totalarea)
+data2$arealargestspot <- as.factor(data2$arealargestspot)
+
+data1$activity <- as.factor(data1$activity)
+data1$evolution <- as.factor(data1$evolution)
+data1$activitycode <- as.factor(data1$activitycode)
+data1$historyproblem <- as.factor(data1$historyproblem)
+data1$recentproblem <- as.factor(data1$recentproblem)
+data1$totalarea <- as.factor(data1$totalarea)
+data1$arealargestspot <- as.factor(data1$arealargestspot)
+}
+
+### getting the summary
+{summary(data2)
+plot(number.dummy~class, data = data2)
+plot(number.dummy~spotsize, data = data2)
+plot(number.dummy~spotdistribution, data = data2)
+plot(number.dummy~activity, data = data2)
+plot(number.dummy~evolution, data = data2)
+plot(number.dummy~activitycode, data = data2)
+plot(number.dummy~historyproblem, data = data2)
+plot(number.dummy~totalarea, data = data2)
+plot(number.dummy~arealargestspot, data = data2)
+
+}
+
+
+
+
+### häufigkeitstabellen
+{table((data2$number.dummy2))
+prop.table(table((data2$number.dummy2)))
+
+prop.table(table(data2$class))
+prop.table(table(data2$spotsize))
+prop.table(table(data2$spotdistribution))
+prop.table(table(data2$activity))
+prop.table(table(data2$evolution))
+prop.table(table(data2$activitycode))
+prop.table(table(data2$historyproblem))
+prop.table(table(data2$recentproblem))
+prop.table(table(data2$totalarea))
+prop.table(table(data2$arealargestspot))
+
+table(data2$cclass)
+table(data2$mclass)
+table(data2$xclass)
+}
+### plots -> pie and barplot der tables
+{
+(table(data2$cclass))
+(table(data2$mclass))
+(table(data2$xclass))
+
+par(mfrow = c (1,3))
+barplot(table(data2$cclass),  main = "C-Class", xlab = "Anzahl der Flares", ylab = "Häufigkeit im Datensatz" )
+barplot(table(data2$mclass),  main = "M-Class", xlab = "Anzahl der Flares", ylab = "Häufigkeit im Datensatz" )
+barplot(table(data2$xclass),  main = "X-Class", xlab = "Anzahl der Flares", ylab = "Häufigkeit im Datensatz" )
+}
+
+### creating the dummies
+install.packages("stringr")
+library(stringr)
+{
+patternB <- "B"
+patternC <- "C"
+patternD <- "D"
+patternE <- "E"
+patternF <- "F"
+patternH <- "H"
+
+patternA <- "A"
+patternK <- "K"
+patternR <- "R"
+patternS <- "S"
+patternX <- "X"
+
+patternI <- "I"
+patternO <- "O"
+
+pattern1 <- "1"
+pattern2 <- "2"
+pattern3 <- "3"
+
+data2$class.dummyB <- as.factor(str_detect(data2$class, patternB))
+data2$class.dummyC <- as.factor(str_detect(data2$class, patternC))
+data2$class.dummyD <- as.factor(str_detect(data2$class, patternD))
+data2$class.dummyE <- as.factor(str_detect(data2$class, patternE))
+data2$class.dummyF <- as.factor(str_detect(data2$class, patternF))
+data2$class.dummyH <- as.factor(str_detect(data2$class, patternH))
+
+data2$spotsize.dummyA <- as.factor(str_detect(data2$spotsize, patternA))
+data2$spotsize.dummyH <- as.factor(str_detect(data2$spotsize, patternH))
+data2$spotsize.dummyK <- as.factor(str_detect(data2$spotsize, patternK))
+data2$spotsize.dummyR <- as.factor(str_detect(data2$spotsize, patternR))
+data2$spotsize.dummyS <- as.factor(str_detect(data2$spotsize, patternS))
+data2$spotsize.dummyX <- as.factor(str_detect(data2$spotsize, patternX))
+
+data2$spotdistribution.dummyC <- as.factor(str_detect(data2$spotdistribution, patternC))
+data2$spotdistribution.dummyI <- as.factor(str_detect(data2$spotdistribution, patternI))
+data2$spotdistribution.dummyO <- as.factor(str_detect(data2$spotdistribution, patternO))
+data2$spotdistribution.dummyX <- as.factor(str_detect(data2$spotdistribution, patternX))
+
+data2$evolution.dummy1 <- as.factor(str_detect(data2$evolution, pattern1))
+data2$evolution.dummy2 <- as.factor(str_detect(data2$evolution, pattern2))
+data2$evolution.dummy3 <- as.factor(str_detect(data2$evolution, pattern3))
+
+data2$activitycode.dummy1 <- as.factor(str_detect(data2$activitycode, pattern1))
+data2$activitycode.dummy2 <- as.factor(str_detect(data2$activitycode, pattern2))
+data2$activitycode.dummy3 <- as.factor(str_detect(data2$activitycode, pattern3))
+
+data2$number.dummy <- data2$cclass + data2$mclass + data2$xclass
+data2$number.dummy2 <- as.factor(data2$number.dummy)
+
+data1$number.dummy <- data1$cclass + data1$mclass + data1$xclass
+data1$number.dummy2 <- as.factor(data1$number.dummy)
+}
+### 3 D pie charts der levelverteilungen
+
+{
+par(mfrow = c(1,1))
+
+install.packages("plotrix")
+library(plotrix)
+mytable <- table(data2$class)
+lbls <- paste(names(mytable), "\n", table(data2$class), sep = "")
+pie3D(mytable, labels = lbls, main = "Levelverteilung des Faktors 'Class' mit Anzahl")
+}
+### decision tree + install packages
+
+{install.packages("tree")
+install.packages("rpart")
+install.packages("rpart.plot")
+install.packages("caret")
+install.packages("ISLR")
+install.packages("keras")
+install.packages("xtable")
+install.packages("tidyverse")
+install.packages("class")
+install.packages("e1071")
+install.packages("psych")
+library(tree)
+library(rpart)
+library(rpart.plot)
+library(caret)
+library(ISLR)
+library(keras)
+library(xtable)
+library(tidyverse)
+library(class)
+library(e1071)
+library(psych)}
+###
+{
+ set.seed(1234)
+
+# taking samples
+ind <- sample(2, nrow(data2), replace=TRUE, prob=c(0.8, 0.20))
+
+# Compose training set
+data2.training <- data2[ind==1,]
+
+# Compose test set
+data2.test <- data2[ind==2,]
+
+ebm <- rpart(data2.test$number.dummy~., data2.training, method = "class" )
+rpart.plot(ebm)
+
+pd <- predict(ebm, data2.test, type = )
+#levels(pd)
+confusionMatrix(pd, as.factor(data2.test$number.dummy))
+#levels(data2.test$classification.dummy)
+}
+### Plots für einleitung
+{plot(data2$class)
+plot(data2$spotsize)
+plot(data2$spotdistribution)
+
+par(mfrow = c (1,2))
+plot(data2$activity, main = "Acitivity", xlab = "Klasse", ylab = "Häufigkeit im Datensatz" )
+plot(data2$evolution, main = "Evolution", xlab = "Klasse", ylab = "Häufigkeit im Datensatz" )
+
+par(mfrow = c (1,2))
+plot(data2$activitycode, main = "Acitivity Code", xlab = "Klasse", ylab = "Häufigkeit im Datensatz" )
+plot(data2$historyproblem, main = "History Problem", xlab = "Klasse", ylab = "Häufigkeit im Datensatz" )
+
+par(mfrow = c (1,2))
+plot(data2$recentproblem, main = "Recent Problem", xlab = "Klasse", ylab = "Häufigkeit im Datensatz" )
+plot(data2$totalarea, main = "Total Area", xlab = "Klasse", ylab = "Häufigkeit im Datensatz" )
+
+plot(data2$arealargestspot)
+
+plot(data2$cclass)
+plot(data2$mclass)
+plot(data2$xclass)
+plot(data2$number.dummy)
+}
+
+install.packages("ggplot2")
+library(ggplot2)
+
+####nicht verwendete Boxplots
+{g <- ggplot(data2, aes(class, number.dummy)) +
+              geom_boxplot()
+g
+h <- ggplot(data2, aes(spotsize, number.dummy)) +
+  geom_boxplot()
+
+i <- ggplot(data2, aes(spotdistribution, number.dummy)) +
+  geom_boxplot()
+i
+j <- ggplot(data2, aes(activity, number.dummy)) +
+  geom_boxplot()
+j
+k <- ggplot(data2, aes(evolution, number.dummy)) +
+  geom_boxplot()
+k
+l <- ggplot(data2, aes(activitycode, number.dummy)) +
+  geom_boxplot()
+l
+m <- ggplot(data2, aes(historyproblem, number.dummy)) +
+  geom_boxplot()
+m
+n <- ggplot(data2, aes(recentproblem, number.dummy)) +
+  geom_boxplot()
+n
+o <- ggplot(data2, aes(arealargestspot, number.dummy)) +
+  geom_boxplot()
+o
+}
+
+
+
+
+### linear models
+glmall <- glm(number.dummy ~ class + spotsize + spotdistribution + activity + evolution + historyproblem + recentproblem + totalarea, data = data2)
+lmall <- glm(number.dummy ~ class + spotsize + spotdistribution + activity + evolution + historyproblem + recentproblem + totalarea, data = data2)
+plot(glmall)
+
+summary (glmall)
+summary(lmall)
+
+peas.aov <- aov(number.dummy ~ class + spotsize + spotdistribution + activity + evolution + historyproblem + recentproblem + totalarea, data = data2)
+summary(peas.aov)
+par(mfrow = c (2,2))
+plot(peas.aov)
+
+data2tab <- xtabs(~class + spotsize + spotdistribution + activity + evolution + historyproblem + recentproblem + totalarea, data = data2)
+summary(assocstats(data2tab))
+
+install.packages("vcd")
+library(vcd)
+
+
+
+
+#####
+
+plot(data2$number.dummy, type = "S", main = "Anzahl an Sonneneruptionen im Datensatz", xlab = "Index im Datensatz", ylab = "Anzahl an Sonneneruptionen")
+
+####
+{
+install.packages("randomForest")
+library(randomForest)
+set.seed(1234)
+
+data2_rf = randomForest(number.dummy~., data = data2[-(11:13)], ntree = 500, proximity = T)
+table(predict(data2_rf), data2$number.dummy)
+
+data2Pred <- predict(data2_rf, newdata = data1[-(11:13)])
+table(data2Pred, data1$number.dummy)
+
+####
+
+data2_rf = randomForest(number.dummy~., data = data2, ntree = 500, proximity = T)
+table(predict(data2_rf), data2$number.dummy)
+
+data2_rf
+plot(data2_rf)
+importance(data2_rf)
+
+data2Pred <- predict(data2_rf, newdata = data1)
+table(data2Pred, data1$number.dummy)
+plot(margin(data2_rf, data1$number.dummy))
+
+cm<- table(data2Pred, data1$number.dummy) 
+cm
+accuarcy <- (sum(diag(cm)))/sum(cm)
+accuarcy
+
+}
+####
+##LINEAR MODELS 
+## 1 variable
+{
+
+lm1 <- glm(number.dummy ~ class, data = data2)
+lm2 <- glm(number.dummy ~ spotsize, data = data2)
+lm3 <- glm(number.dummy ~ spotdistribution, data = data2)
+lm4 <- glm(number.dummy ~ activity, data = data2)
+lm5 <- glm(number.dummy ~ evolution, data = data2) 
+lm6 <- glm(number.dummy ~ activitycode, data = data2)
+lm7 <- glm(number.dummy ~ historyproblem, data = data2)
+lm8 <- glm(number.dummy ~ recentproblem, data = data2)
+lm9 <- glm(number.dummy ~ totalarea, data = data2)
+lm35 <- glm(number.dummy ~ classification.dummy, data = data2)
+lm_all1 <- glm(number.dummy ~ class + spotsize + spotdistribution + activity + evolution + activitycode + historyproblem + recentproblem + totalarea, data = data2)
+lm_all2 <- glm(number.dummy ~ class + spotsize + spotdistribution + activity + activitycode + historyproblem + recentproblem + totalarea, data = data2)
+summary(lm1)
+summary(lm2)
+summary(lm3)
+summary(lm4)
+summary(lm5)
+summary(lm6)
+summary(lm7)
+summary(lm8)
+summary(lm9)
+summary(lm35)
+summary(lm_all1)
+summary(lm_all2)
+
+}
+#### test dummy vs normal 
+{lm_dummy <- lm (number.dummy ~ class.dummyH + class.dummyF + class.dummyE + class.dummyD + class.dummyC + class.dummyB + spotsize.dummyA + spotsize.dummyH + spotsize.dummyK
+                 + spotsize.dummyR + spotsize.dummyS + spotsize.dummyX + spotdistribution.dummyC + spotdistribution.dummyI + spotdistribution.dummyO + spotdistribution.dummyX
+                 + activitycode.dummy1 + activitycode.dummy2 + activitycode.dummy3 + evolution.dummy1 + evolution.dummy2 + evolution.dummy3 
+                 + activitycode.dummy1 + activitycode.dummy2 + activitycode.dummy3 + historyproblem + recentproblem + totalarea, data = data2)
+summary(lm_dummy)
+Anova(lm_dummy)
+summary(lm_dummy)
+}
+#### Contrasts data2
+{
+contrasts(data2$class)
+contrasts(data2$spotsize)
+contrasts(data2$spotdistribution)
+contrasts(data2$activity)
+contrasts(data2$evolution)
+contrasts(data2$activitycode)
+contrasts(data2$historyproblem)
+contrasts(data2$recentproblem)
+contrasts(data2$totalarea)
+}
+
+res <- model.matrix(~ class, data = data2)
+head ( res[, -1])
+
+install.packages("car")
+library(car)
+model2 <- lm(number.dummy ~ class + spotsize + spotdistribution + activity + evolution + activitycode + historyproblem + recentproblem + totalarea, data = data2)
+Anova(model2)
+summary(model2)
+
+#### Quelle :  http://www.sthda.com/english/articles/40-regression-analysis/163-regression-with-categorical-variables-dummy-coding-essentials-in-r/
+
+#####################
+#################
+#############
+#######
+###
+#### treatment und helmert coding
+{
+data2_2 <- within(data2, {
+  class.ct <- C(class, treatment)
+  spotsize.ct <- C(spotsize, treatment)
+  spotdistribution.ct <- C(spotdistribution, treatment)
+  activity.ct <- C(activity, treatment)
+  evolution.ct <- C(evolution, treatment)
+  activitycode.ct <- C(activitycode, treatment)
+  historyproblem.ct <- C(historyproblem, treatment)
+  recentproblem.ct <- C(recentproblem, treatment)
+  totalarea.ct <- C(totalarea, treatment)
+  print(attributes(data2_2))
+  })
+
+lm1ct <- lm(number.dummy ~ class.ct, data = data2_2)
+lm2ct <- lm(number.dummy ~ spotsize.ct, data = data2_2)
+lm3ct <- lm(number.dummy ~ spotdistribution.ct, data = data2_2)
+lm4ct <- lm(number.dummy ~ activity.ct, data = data2_2)
+lm5ct <- lm(number.dummy ~ evolution.ct, data = data2_2)
+lm6ct <- lm(number.dummy ~ activitycode.ct, data = data2_2)
+lm7ct <- lm(number.dummy ~ historyproblem.ct, data = data2_2)
+lm8ct <- lm(number.dummy ~ recentproblem.ct, data = data2_2)
+lm9ct <- lm(number.dummy ~ totalarea.ct, data = data2_2)
+lm35ct <- lm(number.dummy ~ classification.dummy.ct, data = data2_2)
+lm_allct <- lm(number.dummy ~ class.ct + spotsize.ct + spotdistribution.ct + activity.ct + evolution.ct + activitycode.ct + historyproblem.ct + recentproblem.ct + totalarea.ct, data = data2_2)
+
+summary(lm1ct)
+summary(lm2ct)
+summary(lm3ct)
+summary(lm4ct)
+summary(lm5ct)
+summary(lm6ct)
+summary(lm7ct)
+summary(lm8ct)
+summary(lm9ct)
+summary(lm_allct)
+
+
+data2_2 <- within(data2, {
+  class.ch <- C(class, helmert)
+  spotsize.ch <- C(spotsize, helmert)
+  spotdistribution.ch <- C(spotdistribution, helmert)
+  activity.ch <- C(activity, helmert)
+  evolution.ch <- C(evolution, helmert)
+  activitycode.ch <- C(activitycode, helmert)
+  historyproblem.ch <- C(historyproblem, helmert)
+  recentproblem.ch <- C(recentproblem, helmert)
+  totalarea.ch <- C(totalarea, helmert)
+})}
+#### treatment und helmert coding
+{
+lm1ch <- lm(number.dummy ~ class.ch, data = data2_2)
+lm2ch <- lm(number.dummy ~ spotsize.ch, data = data2_2)
+lm3ch <- lm(number.dummy ~ spotdistribution.ch, data = data2_2)
+lm4ch <- lm(number.dummy ~ activity.ch, data = data2_2)
+lm5ch <- lm(number.dummy ~ evolution.ch, data = data2_2)
+lm6ch <- lm(number.dummy ~ activitycode.ch, data = data2_2)
+lm7ch <- lm(number.dummy ~ historyproblem.ch, data = data2_2)
+lm8ch <- lm(number.dummy ~ recentproblem.ch, data = data2_2)
+lm9ch <- lm(number.dummy ~ totalarea.ch, data = data2_2)
+lm35ch <- lm(number.dummy ~ classification.dummy.ch, data = data2_2)
+lm_allch <- lm(number.dummy ~ class.ch + spotsize.ch + spotdistribution.ch + activity.ch + evolution.ch + activitycode.ch + historyproblem.ch + recentproblem.ch + totalarea.ch, data = data2_2)
+
+summary(lm1ch)
+summary(lm2ch)
+summary(lm3ch)
+summary(lm4ch)
+summary(lm5ch)
+summary(lm6ch)
+summary(lm7ch)
+summary(lm8ch)
+summary(lm9ch)
+summary(lm_allch)
+
+summary(data2_2)
+
+contrasts(data2_2$class) <- contr.treatment(6)
+contrasts(data2_2$spotsize) <- contr.treatment(6 ) 
+contrasts(data2_2$spotdistribution ) <- contr.treatment(4 ) 
+contrasts(data2_2$activity ) <- contr.treatment(2 ) 
+contrasts(data2_2$evolution ) <- contr.treatment(3 ) 
+contrasts(data2_2$activitycode ) <- contr.treatment(3 ) 
+contrasts(data2_2$historyproblem ) <- contr.treatment(2 ) 
+contrasts(data2_2$recentproblem ) <- contr.treatment(2 ) 
+contrasts(data2_2$totalarea ) <- contr.treatment(2 ) 
+
+lm1c <- lm(number.dummy ~ class, data = data2_2)
+lm2c <- lm(number.dummy ~ spotsize, data = data2_2)
+lm3c <- lm(number.dummy ~ spotdistribution, data = data2_2)
+lm4c <- lm(number.dummy ~ activity, data = data2_2)
+lm5c <- lm(number.dummy ~ evolution, data = data2_2)
+lm6c <- lm(number.dummy ~ activitycode, data = data2_2)
+lm7c <- lm(number.dummy ~ historyproblem, data = data2_2)
+lm8c <- lm(number.dummy ~ recentproblem, data = data2_2)
+lm9c <- lm(number.dummy ~ totalarea, data = data2_2)
+lm_allc <- lm(number.dummy ~ class + spotsize + spotdistribution + activity + evolution + activitycode + historyproblem + recentproblem + totalarea, data = data2_2)
+
+summary(lm1c)
+summary(lm2c)
+summary(lm3c)
+summary(lm4c)
+summary(lm5c)
+summary(lm6c)
+summary(lm7c)
+summary(lm8c)
+summary(lm9c)
+summary(lm_allc)
+
+#### Quelle : https://stats.idre.ucla.edu/r/modules/coding-for-categorical-variables-in-regression-models/
+}
+#####################
+#################
+#############
+#######
+###
+#
+
+#https://stats.stackexchange.com/questions/88606/multiple-regression-with-categorical-and-numeric-predictors
+#https://stats.stackexchange.com/questions/33413/continuous-dependent-variable-with-ordinal-independent-variable
+
+#https://stats.stackexchange.com/questions/89181/predict-function-and-categorical-variables-in-r
+
+#### Ordered model
+{
+# https://stats.stackexchange.com/questions/88606/multiple-regression-with-categorical-and-numeric-predictors
+fit2 <- glm ( number.dummy ~ ordered(class) + ordered(spotsize) + ordered(spotdistribution) + activity + evolution + activitycode + historyproblem 
+              + recentproblem + totalarea, data = data2)
+
+fit2
+summary(fit2)
+}
+######smoothfit (funktioniert nicht für multivariate daten)
+{
+install.packages("ordPens")
+library(ordPens)
+
+data2_3 <- data2_2
+
+data2_3$class <- as.numeric(data2_3$class)
+data2_3$spotsize <- as.numeric(data2_3$spotsize)
+data2_3$spotdistribution <- as.numeric(data2_3$spotdistribution)
+
+
+SmoothFit = with (data2_3,
+                  ordSmooth(x = as.numeric(data2_3[1:9]), number.dummy, lambda = 0.001))
+summary(SmoothFit)
+SmoothFit$coefficients
+}
+
+#####################
+#################
+#############
+#######
+###
+#
+#####funktionierendes modell
+{
+library(caret)
+predglm<-predict.glm(lm_all2, newdata = data1[1:9] )
+predglmf<-as.factor(round((predict.glm(lm_all, newdata = data1[1:9] )), digits = 0))
+confusionMatrix(predglmf, factor(data1$number.dummy ))
+levels(predglm)
+table(predglmf)
+table(data1$number.dummy)
+str(predglmf)
+
+str(factor(data1$number.dummy))
+levels(predglmf) <- c(levels(predglmf), "4", "5")
+}
+###### Data splitting und anderes modell 
+{
+Train <- createDataPartition(data2$number.dummy, p = 0.95, list = FALSE)
+training1 <- data2[Train,]
+testing1 <- data2[-Train,]
+
+lmodel <- glm(number.dummy~., data = training1)
+summary(lmodel)
+
+predictions <- lmodel %>% predict(testing1)
+predictions <- as.factor(round(predictions))
+
+RMSE(predicitons, testing1$number.dummy)
+
+levels(predictions)
+levels(predictions) <- c(levels(predictions),"2","3", "4")
+levels(as.factor(testing1$number.dummy))
+
+confusionMatrix(predictions, factor(testing1$number.dummy))
+}
+{
+library(caret)
+predglm<-predict.glm(lm_all, newdata = data1[1:9] )
+predglmf<-as.factor(round((predict.glm(lm_all, newdata = data1[1:9] )), digits = 0))
+confusionMatrix(predglmf, factor(data1$number.dummy ))
+levels(predglm)
+table(predglm)
+
+str(predglmf)
+
+str(factor(data1$number.dummy))
+levels(predglmf) <- c(levels(predglmf), "3", "4", "5")
+}
+
+## level adding to dataframe:   https://stackoverflow.com/questions/23316815/add-extra-level-to-factors-in-dataframe
+## crossmatrix:                 https://www.datacamp.com/community/tutorials/confusion-matrix-calculation-r
+
+##                              https://stats.stackexchange.com/questions/33413/continuous-dependent-variable-with-ordinal-independent-variable
+##                              https://stats.stackexchange.com/questions/77796/coding-for-an-ordered-covariate
+##                              https://stats.stackexchange.com/questions/33413/continuous-dependent-variable-with-ordinal-independent-variable
+
+## interaction terms for glm    https://stats.stackexchange.com/questions/88606/multiple-regression-with-categorical-and-numeric-predictors
+
+
+#### predict.zeroinf 
+#predict.zeroinf              https://stats.stackexchange.com/questions/89181/predict-function-and-categorical-variables-in-r
+
+
+
+
+
+#### chi square independence test
+#chi square independence test https://www.r-tutor.com/elementary-statistics/goodness-fit/chi-squared-test-independence
+
+
+
+
+
+
+
+####
+library(caret)
+predglm<-predict.glm(lm_all, newdata = data1[1:9] )
+predglmf<-as.factor(round((predict.glm(lm_all, newdata = data1[1:9] )), digits = 0))
+confusionMatrix(predglmf, factor(data1$number.dummy ))
+levels(predglm)
+table(predglm)
+
+str(predglmf)
+
+str(factor(data1$number.dummy))
+levels(predglmf) <- c(levels(predglmf), "3", "4", "5")
+
+
+
+####
+data2 <- select(data2, -arealargestspot)
+
+ctrl <- trainControl(method = "repeatedcv", number = 10, savePredictions = TRUE)
+
+mod_fit <- train(number.dummy~., data = data2[7:32], method = "lm", trControl = ctrl, tuneLength = 5)
+testing <- sample_n(data2[7:32], 300, replace = TRUE)
+pred = predict(mod_fit, newdata = testing)
+print(mod_fit)
+confusionMatrix(pred, testing$number.dummy)
+table(pred)
+
+#####################
+#################
+#############
+#######
+###
+#
+# https://datascienceplus.com/perform-logistic-regression-in-r/
+install.packages("tidyverse")
+library(tidyverse)
+summary(data1$number.dummy)
+
+
+data1s <- select(data1, -cclass)
+data1s <- select(data1s, -xclass)
+data1s <- select(data1s, -mclass)
+data1s <- select(data1s, -number.dummy2)
+data2 <- select(data2, -cclass)
+data2 <- select(data2, -mclass)
+data2 <- select(data2, -xclass)
+data2 <- select(data2, -number.dummy2)
+data2 <- select(data2, -arealargestspot )
+
+fdata2 <- filter(data2, data2$number.dummy > 0)
+sdata2 <- sample_n(data2, 402, replace = TRUE)
+data2_training <- rbind(fdata2, sdata2)
+data2_training <- select(data2_training, -mclass)
+data2_training <- select(data2_training, -arealargestspot)
+data2_training$number.dummy <- as.factor(data2_training$number.dummy)
+data2_test <- select(data2_test, -arealargestspot)
+
+data2_test = sample_n(data2, 100, replace = TRUE)
+data2_test$number.dummy <- as.factor(data2_test$number.dummy)
+
+model1 <- glm(number.dummy~., family = binomial(link = 'logit'), data = data2_training)
+summary (model1)
+
+anova(model1, test = "Chisq")
+
+fitted.results <- predict(model1, newdata = data2_test)
+summary(fitted.results)
+fitted.results
+
+
+
+```
+
+<!--
+# References
+\setlength{\parindent}{-0.2in}
+\setlength{\leftskip}{0.2in}
+\setlength{\parskip}{8pt}
+\vspace*{-0.2in}
+\noindent
+-->
